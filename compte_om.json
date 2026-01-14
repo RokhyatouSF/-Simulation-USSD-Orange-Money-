@@ -1,0 +1,60 @@
+{
+    "solde": 35000,
+    "journal": [
+        {
+            "operation": "TRANSFERT",
+            "montant": 1000,
+            "detail": "Vers 774536475",
+            "date": "14/01/2026 13:11:06"
+        },
+        {
+            "operation": "ANNULATION",
+            "montant": 3500,
+            "detail": "Annulation transfert",
+            "date": "14/01/2026 13:09:48"
+        },
+        {
+            "operation": "TRANSFERT",
+            "montant": 3500,
+            "detail": "Vers 776849503",
+            "date": "14/01/2026 13:09:33"
+        },
+        {
+            "operation": "TRANSFERT",
+            "montant": 2000,
+            "detail": "Vers 777209783",
+            "date": "14/01/2026 13:09:04"
+        },
+        {
+            "operation": "ANNULATION",
+            "montant": 1000,
+            "detail": "Annulation transfert",
+            "date": "14/01/2026 07:57:49"
+        },
+        {
+            "operation": "TRANSFERT",
+            "montant": 1000,
+            "detail": "Vers 785642345",
+            "date": "14/01/2026 07:56:43"
+        },
+        {
+            "operation": "TRANSFERT",
+            "montant": 10000,
+            "detail": "Vers 784451101",
+            "date": "14/01/2026 07:56:11"
+        },
+        {
+            "operation": "FORFAIT",
+            "montant": 500,
+            "detail": "Pass Internet 100 Mo",
+            "date": "14/01/2026 07:55:12"
+        },
+        {
+            "operation": "ACHAT_CREDIT",
+            "montant": 1500,
+            "detail": "Recharge credit",
+            "date": "14/01/2026 07:54:51"
+        }
+    ],
+    "transfert_recent": 1000
+}

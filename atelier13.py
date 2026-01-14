@@ -1,7 +1,8 @@
 import time
+import json
+import os
 
 # PARAMÈTRES DU COMPTE ORANGE MONEY
-
 compte_om_solde = 50000
 code_secret_client = "1234"
 limite_tentatives_pin = 3
@@ -12,12 +13,49 @@ memoire_transfert_recent = None
 duree_max_session_ussd = 180
 horodatage_derniere_action = time.time()
 
+FICHIER_DONNEES = "compte_om.json"
 
-# FONCTIONS UTILITAIRES USSD
+
+# PERSISTANCE DES DONNÉES
+
+def sauvegarder_donnees():
+    try:
+        donnees = {
+            "solde": compte_om_solde,
+            "journal": journal_operations_om,
+            "transfert_recent": memoire_transfert_recent
+        }
+
+        with open(FICHIER_DONNEES, "w", encoding="utf-8") as f:
+            json.dump(donnees, f, indent=4)
+
+    except IOError:
+        print("Erreur lors de la sauvegarde des données.")
+
+
+def charger_donnees():
+    global compte_om_solde, journal_operations_om, memoire_transfert_recent
+
+    try:
+        if not os.path.exists(FICHIER_DONNEES):
+            return 
+
+        with open(FICHIER_DONNEES, "r", encoding="utf-8") as f:
+            donnees = json.load(f)
+
+            compte_om_solde = donnees.get("solde", 50000)
+            journal_operations_om = donnees.get("journal", [])
+            memoire_transfert_recent = donnees.get("transfert_recent", None)
+
+    except (IOError, json.JSONDecodeError):
+        print("Erreur lors du chargement des données. Données réinitialisées.")
+
+
+# FONCTIONS  USSD
 def verifier_delai_session_ussd():
     global horodatage_derniere_action
     if time.time() - horodatage_derniere_action > duree_max_session_ussd:
-        print("\n Session USSD expirée. Recomposez #144#")
+        print("\nSession USSD expirée. Recomposez #144#")
         return True
     horodatage_derniere_action = time.time()
     return False
@@ -26,12 +64,12 @@ def verifier_delai_session_ussd():
 def authentifier_utilisateur():
     tentatives = 0
     while tentatives < limite_tentatives_pin:
-        pin_saisi = input("Entrez votre code secret : ")
-        if pin_saisi == code_secret_client:
+        pin = input("Entrez votre code secret : ")
+        if pin == code_secret_client:
             return True
         print("Code secret incorrect.")
         tentatives += 1
-    print(" Accès bloqué.")
+    print("Accès bloqué.")
     return False
 
 
@@ -48,7 +86,7 @@ def saisir_montant_transaction():
 
 
 def confirmer_operation_client():
-    choix = input("1. Confirmer\n 2. Annuler\nVotre choix : ")
+    choix = input("1. Confirmer\n2. Annuler\nVotre choix : ")
     return choix == "1"
 
 
@@ -58,17 +96,18 @@ def verifier_format_numero_msisdn(msisdn):
 
 
 def enregistrer_operation_journal(type_op, montant, libelle):
-    journal_operations_om.append({
+    journal_operations_om.insert(0, {  
         "operation": type_op,
         "montant": montant,
-        "detail": libelle
+        "detail": libelle,
+        "date": time.strftime("%d/%m/%Y %H:%M:%S")
     })
 
 
 
 # SERVICES ORANGE MONEY
 def afficher_solde_compte_om():
-    print(f"\n Solde disponible : {compte_om_solde} F CFA")
+    print(f"\nSolde disponible : {compte_om_solde} F CFA")
 
 
 def executer_achat_credit_om():
@@ -81,15 +120,16 @@ def executer_achat_credit_om():
 
     if confirmer_operation_client() and authentifier_utilisateur():
         compte_om_solde -= montant
-        enregistrer_operation_journal("ACHAT_CRÉDIT", montant, "Recharge crédit")
+        enregistrer_operation_journal("ACHAT_CREDIT", montant, "Recharge credit")
+        sauvegarder_donnees()
         print(f"Achat effectué. Nouveau solde : {compte_om_solde} F")
 
 
 def executer_transfert_om():
     global compte_om_solde, memoire_transfert_recent
 
-    numero_cible = input("Numéro du bénéficiaire : ")
-    if not verifier_format_numero_msisdn(numero_cible):
+    numero = input("Numéro du bénéficiaire : ")
+    if not verifier_format_numero_msisdn(numero):
         print("Numéro non valide.")
         return
 
@@ -98,45 +138,45 @@ def executer_transfert_om():
         print("Solde insuffisant.")
         return
 
-    print(f"Transfert de {montant} F vers {numero_cible}")
     if confirmer_operation_client() and authentifier_utilisateur():
         compte_om_solde -= montant
         memoire_transfert_recent = montant
-        enregistrer_operation_journal("TRANSFERT", montant, f"Vers {numero_cible}")
+        enregistrer_operation_journal("TRANSFERT", montant, f"Vers {numero}")
+        sauvegarder_donnees()
         print(f"Transfert réussi. Solde : {compte_om_solde} F")
 
 
 def proposer_forfaits_internet_om():
     global compte_om_solde
 
-    catalogue_forfaits = {
+    forfaits = {
         1: ("Pass Internet 100 Mo", 500),
         2: ("Pass Internet 500 Mo", 1000),
         3: ("Pass Internet 1 Go", 2000)
     }
 
-    print("\n FORFAITS INTERNET")
-    for code, forfait in catalogue_forfaits.items():
-        print(f"{code}. {forfait[0]} - {forfait[1]} F")
+    for k, v in forfaits.items():
+        print(f"{k}. {v[0]} - {v[1]} F")
 
     try:
         choix = int(input("Sélectionnez un forfait : "))
-        if choix not in catalogue_forfaits:
-            print("Choix incorrect.")
+        if choix not in forfaits:
+            print("Choix invalide.")
             return
 
-        prix = catalogue_forfaits[choix][1]
+        prix = forfaits[choix][1]
         if prix > compte_om_solde:
             print("Solde insuffisant.")
             return
 
         if confirmer_operation_client() and authentifier_utilisateur():
             compte_om_solde -= prix
-            enregistrer_operation_journal("FORFAIT", prix, catalogue_forfaits[choix][0])
+            enregistrer_operation_journal("FORFAIT", prix, forfaits[choix][0])
+            sauvegarder_donnees()
             print(f"Forfait activé. Solde : {compte_om_solde} F")
 
     except ValueError:
-        print("Erreur de sélection.")
+        print("Erreur de saisie.")
 
 
 def annuler_transfert_recent_om():
@@ -146,11 +186,11 @@ def annuler_transfert_recent_om():
         print("Aucun transfert à annuler.")
         return
 
-    print(f"Annuler le transfert de {memoire_transfert_recent} F ?")
     if confirmer_operation_client() and authentifier_utilisateur():
         compte_om_solde += memoire_transfert_recent
         enregistrer_operation_journal("ANNULATION", memoire_transfert_recent, "Annulation transfert")
         memoire_transfert_recent = None
+        sauvegarder_donnees()
         print(f"Transfert annulé. Solde : {compte_om_solde} F")
 
 
@@ -159,17 +199,16 @@ def afficher_journal_operations():
         print("Aucune opération enregistrée.")
         return
 
-    print("\n JOURNAL DES OPÉRATIONS")
-    for index, op in enumerate(journal_operations_om, start=1):
-        print(f"{index}. {op['operation']} - {op['montant']} F ({op['detail']})")
+    for i, op in enumerate(journal_operations_om, start=1):
+        print(f"{i}. {op['date']} - {op['operation']} - {op['montant']} F ({op['detail']})")
 
 
-# INTERFACE USSD PRINCIPALE
 
+# MENU USSD
 
 def afficher_menu_ussd_om():
     print("""
-  ORANGE MONEY - #144#
+ORANGE MONEY - #144#
 1. Consulter le solde
 2. Achat de crédit
 3. Transfert d'argent
@@ -180,9 +219,9 @@ def afficher_menu_ussd_om():
 """)
 
 
-
 # PROGRAMME PRINCIPAL
 
+charger_donnees()
 print("Composer #144#")
 
 while True:
@@ -190,21 +229,21 @@ while True:
         break
 
     afficher_menu_ussd_om()
-    selection = input("Votre choix : ")
+    choix = input("Votre choix : ")
 
-    if selection == "1":
+    if choix == "1":
         afficher_solde_compte_om()
-    elif selection == "2":
+    elif choix == "2":
         executer_achat_credit_om()
-    elif selection == "3":
+    elif choix == "3":
         executer_transfert_om()
-    elif selection == "4":
+    elif choix == "4":
         proposer_forfaits_internet_om()
-    elif selection == "5":
+    elif choix == "5":
         annuler_transfert_recent_om()
-    elif selection == "6":
+    elif choix == "6":
         afficher_journal_operations()
-    elif selection == "0":
+    elif choix == "0":
         print("Merci d’avoir utilisé Orange Money.")
         break
     else:
